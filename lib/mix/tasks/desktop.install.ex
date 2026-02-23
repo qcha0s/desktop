@@ -1,3 +1,4 @@
+if Code.ensure_loaded?(Igniter.Mix.Task) do
 defmodule Mix.Tasks.Desktop.Install do
   @shortdoc "Add Elixir Desktop support to an existing project"
 
@@ -177,4 +178,5 @@ defmodule Mix.Tasks.Desktop.Install do
       fn zipper -> {:ok, zipper} end
     )
   end
+end
 end
