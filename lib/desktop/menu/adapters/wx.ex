@@ -298,7 +298,9 @@ defmodule Desktop.Menu.Adapter.Wx do
             _other -> Wx.wxITEM_NORMAL()
           end
 
-        item = :wxMenuItem.new(id: Wx.wxID_ANY(), text: List.flatten(content), kind: kind)
+        id = role_to_id(attr[:role])
+
+        item = :wxMenuItem.new(id: id, text: List.flatten(content), kind: kind)
 
         id = :wxMenuItem.getId(item)
 
@@ -350,4 +352,9 @@ defmodule Desktop.Menu.Adapter.Wx do
   defp true?(value) do
     value != nil and value != "false" and value != "0" and value != ""
   end
+
+  defp role_to_id("about"), do: Wx.wxID_ABOUT()
+  defp role_to_id("preferences"), do: Wx.wxID_PREFERENCES()
+  defp role_to_id("quit"), do: Wx.wxID_EXIT()
+  defp role_to_id(_), do: Wx.wxID_ANY()
 end

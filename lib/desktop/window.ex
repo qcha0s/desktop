@@ -100,6 +100,7 @@ defmodule Desktop.Window do
     :home_url,
     :last_url,
     :title,
+    :menu_pid,
     on_close: :quit
   ]
 
@@ -126,6 +127,7 @@ defmodule Desktop.Window do
     window_title = options[:title] || Atom.to_string(options[:id])
     size = options[:size] || {600, 500}
     min_size = options[:min_size]
+    max_size = options[:max_size]
     app = options[:app]
     icon = options[:icon]
     taskbar_icon = options[:taskbar_icon]
@@ -162,6 +164,10 @@ defmodule Desktop.Window do
       :wxFrame.setMinSize(frame, min_size)
     end
 
+    if max_size do
+      :wxFrame.setMaxSize(frame, max_size)
+    end
+
     :wxFrame.setSizer(frame, :wxBoxSizer.new(Wx.wxHORIZONTAL()))
 
     {:ok, icon} =
@@ -173,7 +179,7 @@ defmodule Desktop.Window do
     :wxTopLevelWindow.setIcon(frame, icon)
     env = Desktop.Env.wx_env()
 
-    wx_menubar =
+    {wx_menubar, menubar_pid} =
       if menubar do
         {:ok, menu_pid} =
           Menu.start_link(
@@ -185,7 +191,9 @@ defmodule Desktop.Window do
 
         wx_menubar = Menu.menubar(menu_pid)
         :wxFrame.setMenuBar(frame, wx_menubar)
-        wx_menubar
+        {wx_menubar, menu_pid}
+      else
+        {nil, nil}
       end
 
     if OS.type() == MacOS do
@@ -224,6 +232,7 @@ defmodule Desktop.Window do
       home_url: url,
       title: window_title,
       taskbar: taskbar,
+      menu_pid: menubar_pid,
       on_close: on_close
     }
 
@@ -521,9 +530,22 @@ defmodule Desktop.Window do
     {:noreply, ui}
   end
 
-  def handle_event(wx(id: id, event: wxCommand(type: :command_menu_selected)), ui) do
-    if id == Wx.wxID_EXIT() do
-      quit()
+  def handle_event(
+        wx(id: id, event: wxCommand(type: :command_menu_selected)),
+        ui = %Window{menu_pid: menu_pid}
+      ) do
+    cond do
+      id == Wx.wxID_EXIT() ->
+        quit()
+
+      id == Wx.wxID_ABOUT() and menu_pid != nil ->
+        Menu.trigger_event(menu_pid, "about")
+
+      id == Wx.wxID_PREFERENCES() and menu_pid != nil ->
+        Menu.trigger_event(menu_pid, "preferences")
+
+      true ->
+        :ok
     end
 
     {:noreply, ui}
@@ -726,17 +748,26 @@ defmodule Desktop.Window do
     |> URI.to_string()
   end
 
+  @macos_app_menu_ids [&Wx.wxID_EXIT/0, &Wx.wxID_ABOUT/0, &Wx.wxID_PREFERENCES/0]
+
   defp update_apple_menu(title, frame, menubar) do
     menu = :wxMenuBar.oSXGetAppleMenu(menubar)
     :wxMenu.setTitle(menu, title)
 
-    # Remove all items except for Quit since we don't yet handle the standard items
-    # like "Hide <app>", "Hide Others", "Show All", etc
+    keep_ids = Enum.map(@macos_app_menu_ids, & &1.())
+
     for item <- :wxMenu.getMenuItems(menu) do
-      if :wxMenuItem.getId(item) == Wx.wxID_EXIT() do
-        :wxMenuItem.setText(item, "Quit #{title}\tCtrl+Q")
-      else
-        :wxMenu.delete(menu, item)
+      id = :wxMenuItem.getId(item)
+
+      cond do
+        id == Wx.wxID_EXIT() ->
+          :wxMenuItem.setText(item, "Quit #{title}\tCtrl+Q")
+
+        id in keep_ids ->
+          :ok
+
+        true ->
+          :wxMenu.delete(menu, item)
       end
     end
 
