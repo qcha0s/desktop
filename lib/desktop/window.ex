@@ -196,8 +196,8 @@ defmodule Desktop.Window do
         {nil, nil}
       end
 
-    if OS.type() == MacOS do
-      update_apple_menu(window_title, frame, wx_menubar || :wxMenuBar.new())
+    if OS.type() == MacOS and wx_menubar != nil do
+      update_apple_menu(window_title, frame, wx_menubar)
     end
 
     taskbar =
