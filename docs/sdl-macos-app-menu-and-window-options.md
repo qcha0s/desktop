@@ -3,7 +3,7 @@
 **Author:** Robert French
 **Date:** 2026-02-23
 **Status:** Proposed
-**Affects:** `Desktop.Window`, `Desktop.Wx`, `Desktop.Menu.Adapter.Wx`
+**Affects:** `Desktop.Window`, `Desktop.Wx`, `desktop_wx.erl`, `Desktop.Menu.Adapter.Wx`
 
 ---
 
@@ -65,15 +65,21 @@ Setting both to the same value as `size` creates a fixed-size window.
 
 ## Changes
 
-### 1. `Desktop.Wx` (`lib/desktop/wx.ex`)
+### 1. `Desktop.Wx` (`lib/desktop/wx.ex`) + `desktop_wx.erl` (`src/desktop_wx.erl`)
 
 Add `ID_ABOUT` and `ID_PREFERENCES` to the constants list so the
-corresponding `wxID_ABOUT()` and `wxID_PREFERENCES()` functions are generated:
+corresponding `wxID_ABOUT()` and `wxID_PREFERENCES()` functions are generated.
+The Erlang source `desktop_wx.erl` also gains the matching `get/1` clauses:
 
 ```elixir
 @constants ~w(
   ID_ANY ID_EXIT ID_ABOUT ID_PREFERENCES DEFAULT_FRAME_STYLE ...
 )
+```
+
+```erlang
+get(wxID_ABOUT) -> ?wxID_ABOUT;
+get(wxID_PREFERENCES) -> ?wxID_PREFERENCES;
 ```
 
 ### 2. `Desktop.Menu.Adapter.Wx` (`lib/desktop/menu/adapters/wx.ex`)
@@ -172,7 +178,15 @@ def handle_event(
 end
 ```
 
-### 6. `update_apple_menu/3` (`lib/desktop/window.ex`)
+### 6. `update_apple_menu/3` guard (`lib/desktop/window.ex`)
+
+`update_apple_menu` is now only called for windows that have a menubar
+(`wx_menubar != nil`). Previously it ran for every window on macOS, creating
+a throwaway `wxMenuBar.new()` for windows without one (e.g., an About panel),
+which wasted resources and overwrote the Apple menu title with the wrong
+window's name.
+
+### 7. `update_apple_menu/3` implementation (`lib/desktop/window.ex`)
 
 Preserve About and Preferences items in the macOS app menu instead of
 deleting them:
